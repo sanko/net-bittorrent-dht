@@ -3,6 +3,7 @@ Revision history for Perl extension Net-BitTorrent-DHT
 {{$NEXT}}
 
     - Generate local node id based on external IP (work in progress)
+    - Use a condvar in address resolver instead of forcing the event loop
 
 v1.0.0 2014-06-21T16:04:36Z
 

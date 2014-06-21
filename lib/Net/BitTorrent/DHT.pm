@@ -556,19 +556,16 @@ sub __duration ($) {
 }
 
 sub sockaddr ($$) {
-    my $done = 0;
-    my $return;
+    my $resolver = AE::cv();
     AnyEvent::Socket::resolve_sockaddr(
         $_[0],
         $_[1],
         0, undef, undef,
         sub {
-            $return = $_[0]->[3];
-            $done++;
+            $resolver->send($_[0]->[3]);
         }
     );
-    AnyEvent::Loop::one_event() while !$done;
-    return $return;
+    return $resolver->recv();
 }
 
 sub unpack_sockaddr ($) {
