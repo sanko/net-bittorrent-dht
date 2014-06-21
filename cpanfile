@@ -1,5 +1,6 @@
 requires 'AnyEvent';
 requires 'AnyEvent::Util';
+requires 'AnyEvent::HTTP';
 requires 'Bit::Vector';
 requires 'Moose';
 requires 'Moose::Role';

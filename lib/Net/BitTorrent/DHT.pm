@@ -3,6 +3,7 @@ use Moose;
 use Moose::Util;
 use AnyEvent;
 use AnyEvent::Socket qw[];
+use AnyEvent::HTTP;
 use Socket qw[/SOCK_/ /F_INET/ inet_aton /sockaddr_in/ inet_ntoa
     SOL_SOCKET SO_REUSEADDR
 ];
@@ -11,8 +12,9 @@ use Bit::Vector;
 use Net::BitTorrent::DHT::Node;
 use Net::BitTorrent::DHT::RoutingTable;
 use 5.10.0;
-our $VERSION = 'v1.0.0';
+our $VERSION = 'v1.0.1';
 eval $VERSION;
+
 # Stub
 sub BUILD {1}
 #
@@ -27,7 +29,6 @@ after 'BUILD' => sub {
     return has '+client' =>
         (handles => qr[^(?:(?:has_)?udp\d.*?|ip_filter|port)])
         if $s->has_client;
-
     Moose::Util::apply_all_roles($s,
                                  'Net::BitTorrent::DHT::Standalone',
                                  {rebless_params => $a});
@@ -65,8 +66,29 @@ has 'nodeid' => (isa        => 'Bit::Vector',
                  builder    => '_build_nodeid'
 );
 
-sub _build_nodeid {    Bit::Vector->new_Dec(160, time * $^T) }
+sub _build_nodeid {
 
+    # TODO: Base on DHT security extention: http://libtorrent.org/dht_sec.html
+    my $cv = AE::cv;
+    AnyEvent::HTTP::http_get(
+        "http://icanhazip.com",
+        sub {
+            chomp $_[0];
+            $cv->send($_[0]);
+        }
+    );
+
+    # alt services
+    # myip.dnsomatic.com
+    # ipecho.net/plain
+    # ipv4.icanhazip.com
+    # bot.whatismyipaddress.com
+    # www.myip.ru
+    my $ip = AnyEvent::Socket::parse_address($cv->recv);    # Ext ipv4 address
+    return
+        Bit::Vector->new_Hex(160, unpack 'H*', join '', $ip,
+                             (map { chr rand 16 } 1 .. 16));
+}
 #
 sub send {
     my ($s, $node, $packet, $reply) = @_;
@@ -175,7 +197,6 @@ for my $type (qw[get_peers announce_peer find_node]) {
 sub get_peers {
     my ($self, $infohash, $code) = @_;
     $infohash = Bit::Vector->new_Hex(160, $infohash);
-
     Scalar::Util::weaken $self;
     my $quest = [
         $infohash,
@@ -229,7 +250,6 @@ sub find_node {
 
     # TODO: Don't coerce values!!!!!
     $target = Bit::Vector->new_Hex(160, $target) if !ref $target;
-
     Scalar::Util::weaken $self;
     my $quest = [
         $target, $code,
@@ -534,28 +554,29 @@ sub __duration ($) {
     );
     return join ' ', map { $dhms{$_} ? $dhms{$_} . $_ : () } sort keys %dhms;
 }
- sub sockaddr ($$) {
-        my $done = 0;
-        my $return;
-        AnyEvent::Socket::resolve_sockaddr(
-            $_[0],
-            $_[1],
-            0, undef, undef,
-            sub {
-                $return = $_[0]->[3];
-                $done++;
-            }
-        );
-        AnyEvent::Loop::one_event() while !$done;
-        return $return;
-    }
-    sub unpack_sockaddr ($) {
-        my ($packed_host) = @_;
-        return
-            length $packed_host == 28
-            ? (unpack('SnLa16L', $packed_host))[1, 3]
-            : unpack_sockaddr_in($packed_host);
-    }
+
+sub sockaddr ($$) {
+    my $done = 0;
+    my $return;
+    AnyEvent::Socket::resolve_sockaddr(
+        $_[0],
+        $_[1],
+        0, undef, undef,
+        sub {
+            $return = $_[0]->[3];
+            $done++;
+        }
+    );
+    AnyEvent::Loop::one_event() while !$done;
+    return $return;
+}
+
+sub unpack_sockaddr ($) {
+    my ($packed_host) = @_;
+    return length $packed_host == 28 ?
+        (unpack('SnLa16L', $packed_host))[1, 3]
+        : unpack_sockaddr_in($packed_host);
+}
 
 sub __data($) {
           $_[0] >= 1073741824 ? sprintf('%0.2f GB', $_[0] / 1073741824)
