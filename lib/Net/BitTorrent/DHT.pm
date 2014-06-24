@@ -12,7 +12,7 @@ use Bit::Vector;
 use Net::BitTorrent::DHT::Node;
 use Net::BitTorrent::DHT::RoutingTable;
 use 5.10.0;
-our $VERSION = 'v1.0.1';
+our $VERSION = 'v1.0.2';
 eval $VERSION;
 
 # Stub
@@ -60,34 +60,31 @@ for my $type (qw[requests replies]) {
         }
     }
 }
-has 'nodeid' => (isa        => 'Bit::Vector',
+has nodeid => (isa         => 'Bit::Vector',
                  is         => 'ro',
-                 lazy_build => 1,
                  builder    => '_build_nodeid'
 );
 
 sub _build_nodeid {
-
+    my $s = shift;
     # TODO: Base on DHT security extention: http://libtorrent.org/dht_sec.html
-    my $cv = AE::cv;
     AnyEvent::HTTP::http_get(
-        "http://icanhazip.com",
+        'http://icanhazip.com',
         sub {
             chomp $_[0];
-            $cv->send($_[0]);
-        }
+            $s->nodeid->from_Hex(unpack 'H*', join '',
+            AnyEvent::Socket::parse_address($_[0]),# Ext ipv4 address
+                             (map { chr rand 16 } 1 .. 16));
+}
     );
 
-    # alt services
+    # alt services:
     # myip.dnsomatic.com
     # ipecho.net/plain
     # ipv4.icanhazip.com
     # bot.whatismyipaddress.com
     # www.myip.ru
-    my $ip = AnyEvent::Socket::parse_address($cv->recv);    # Ext ipv4 address
-    return
-        Bit::Vector->new_Hex(160, unpack 'H*', join '', $ip,
-                             (map { chr rand 16 } 1 .. 16));
+    return Bit::Vector->new(160);
 }
 #
 sub send {
@@ -123,7 +120,7 @@ sub send {
     return $sent;
 }
 #
-has 'ipv4_routing_table' => (isa => 'Net::BitTorrent::DHT::RoutingTable',
+has ipv4_routing_table => (isa => 'Net::BitTorrent::DHT::RoutingTable',
                              is  => 'ro',
                              lazy_build => 1,
                              handles    => {
@@ -131,7 +128,7 @@ has 'ipv4_routing_table' => (isa => 'Net::BitTorrent::DHT::RoutingTable',
                                          ipv4_buckets  => 'buckets'
                              }
 );
-has 'ipv6_routing_table' => (isa => 'Net::BitTorrent::DHT::RoutingTable',
+has ipv6_routing_table => (isa => 'Net::BitTorrent::DHT::RoutingTable',
                              is  => 'ro',
                              lazy_build => 1,
                              handles    => {
@@ -150,12 +147,16 @@ sub _build_ipv6_routing_table {
 
 sub add_node {
     my ($s, $n) = @_;
-    my $sockaddr
-        = sockaddr($n->[0], $n->[1]);
-    return if !$sockaddr;
-    $n
-        = blessed $n ? $n
-        : Net::BitTorrent::DHT::Node->new(
+    AnyEvent::Socket::resolve_sockaddr(
+        $n->[0],
+        $n->[1],
+        0, undef, undef,
+        sub {
+            my $sockaddr = $_[0]->[3];
+            return if !$sockaddr;
+            $n
+                = blessed $n ? $n
+                : Net::BitTorrent::DHT::Node->new(
                            host          => $n->[0],
                            port          => $n->[1],
                            sockaddr      => $sockaddr,
@@ -163,11 +164,13 @@ sub add_node {
                                length $sockaddr == 28 ? $s->ipv6_routing_table
                                : $s->ipv4_routing_table
                            )
-        );
-    ($n->ipv6 ?
-         $s->ipv6_routing_table->add_node($n)
-     : $s->ipv4_routing_table->add_node($n)
-    )->find_node($s->nodeid);
+                );
+            ($n->ipv6 ?
+                 $s->ipv6_routing_table->add_node($n)
+             : $s->ipv4_routing_table->add_node($n)
+            )->find_node($s->nodeid) if! $s->nodeid->is_empty;
+        }
+    );
 }
 after 'BUILD' => sub {
     my ($self, $args) = @_;
@@ -549,19 +552,6 @@ sub __duration ($) {
                 s => $_[0] % 60
     );
     return join ' ', map { $dhms{$_} ? $dhms{$_} . $_ : () } sort keys %dhms;
-}
-
-sub sockaddr ($$) {
-    my $resolver = AE::cv();
-    AnyEvent::Socket::resolve_sockaddr(
-        $_[0],
-        $_[1],
-        0, undef, undef,
-        sub {
-            $resolver->send($_[0]->[3]);
-        }
-    );
-    return $resolver->recv();
 }
 
 sub unpack_sockaddr ($) {
