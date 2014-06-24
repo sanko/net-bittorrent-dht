@@ -3,6 +3,7 @@ use warnings;
 use AnyEvent;
 use lib '../lib';
 use Net::BitTorrent::DHT;
+use Bit::Vector;
 $|++;
 our $VERSION = 'v1.0.0';
 eval $VERSION;
@@ -17,9 +18,9 @@ my $dht = Net::BitTorrent::DHT->new(
 # Two 'quests' for peers (these are two popular Ubuntu swarms)
 # See http://torrent.ubuntu.com:6969/ for updated list
 my $quest_A
-    = $dht->get_peers('ab97a7bca78f2628380e6609a8241a7fb02aa981', \&dht_cb);
+    = $dht->get_peers(Bit::Vector->new_Hex(160, 'ab97a7bca78f2628380e6609a8241a7fb02aa981'), \&dht_cb);
 my $quest_B
-    = $dht->get_peers('79053908d904e26b45e5b63a6d9b121b59ed7375', \&dht_cb);
+    = $dht->get_peers(Bit::Vector->new_Hex(160, '79053908d904e26b45e5b63a6d9b121b59ed7375'), \&dht_cb);
 
 # Let's stay up to date with what's going on in the routing table
 my $timer = AE::timer 60 * 2, 60 * 5,

@@ -196,7 +196,6 @@ for my $type (qw[get_peers announce_peer find_node]) {
 #
 sub get_peers {
     my ($self, $infohash, $code) = @_;
-    $infohash = Bit::Vector->new_Hex(160, $infohash);
     Scalar::Util::weaken $self;
     my $quest = [
         $infohash,
@@ -247,9 +246,6 @@ sub announce_peer {
 
 sub find_node {
     my ($self, $target, $code) = @_;
-
-    # TODO: Don't coerce values!!!!!
-    $target = Bit::Vector->new_Hex(160, $target) if !ref $target;
     Scalar::Util::weaken $self;
     my $quest = [
         $target, $code,
@@ -593,6 +589,7 @@ Net::BitTorrent::DHT - Kademlia-like DHT Node
 
     use Net::BitTorrent::DHT;
     use AnyEvent;
+    use Bit::Vector;
     # Standalone node with user-defined port and boot_nodes
     my $dht = Net::BitTorrent::DHT->new(
           port => [1337 .. 1340, 0],
@@ -601,7 +598,7 @@ Net::BitTorrent::DHT - Kademlia-like DHT Node
     );
 
     my $peer_quest
-    = $dht->get_peers('ab97a7bca78f2628380e6609a8241a7fb02aa981', \&dht_cb);
+    = $dht->get_peers(Bit::Vector->new_Hex('ab97a7bca78f2628380e6609a8241a7fb02aa981'), \&dht_cb);
 
     # tick, tick, tick, ...
     AnyEvent->condvar->recv;
@@ -638,7 +635,7 @@ L<Net::BitTorrent|Net::BitTorrent> client is passed and serves as the parent
 of this node. For brevity, the following examples assume you are building a
 L<standalone node|Net::BitTorrent::DHT::Standalone> (for reasearch, etc.).
 
-=head2 Net::BitTorrent::DHT->new( nodeid => 'F' x 40 )
+=head2 Net::BitTorrent::DHT->new( nodeid => ... )
 
 During construction, our local DHT nodeID can be set during construction. This
 is mostly useful when creating a
@@ -686,7 +683,9 @@ remote nodes respond, the callback is called with the following arguments:
 =item * target
 
 This is the target nodeid. This is useful when you've set the same callback
-for multiple, concurrent C<find_node( )> L<quest|/"Quests and Callbacks"> .
+for multiple, concurrent C<find_node( )> L<quest|/"Quests and Callbacks">.
+
+Targets are 160-bit L<Bit::Vector|Bit::Vector> objects.
 
 =item * node
 
@@ -734,7 +733,8 @@ As they are found, the callback is called with the following arguments:
 =item * infohash
 
 This is the infohash related to these peers. This is useful when you've set
-the same callback for multiple, concurrent C<get_peers( )> quests.
+the same callback for multiple, concurrent C<get_peers( )> quests. This is a
+160-bit L<Bit::Vector|Bit::Vector> object.
 
 =item * node
 
@@ -753,7 +753,8 @@ is an array ref which contains the following data:
 
 =item * infohash
 
-This is the infohash related to these peers.
+This is the infohash related to these peers. This is a 160-bit
+L<Bit::Vector|Bit::Vector> object.
 
 =item * coderef
 
@@ -787,7 +788,8 @@ called with the following arguments:
 
 This is the infohash related to this announcment. This is useful when you've
 set the same callback for multiple, concurrent C<announce_peer( )>
-L<quest|/"Quests and Callbacks"> .
+L<quest|/"Quests and Callbacks">. Infohashes are 160-bit
+L<Bit::Vector|Bit::Vector> objects.
 
 =item * port
 
@@ -806,7 +808,8 @@ which contains the following data:
 
 =item * infohash
 
-This is the infohash related to these peers.
+This is the infohash related to these peers. This is a 160-bit
+L<Bit::Vector|Bit::Vector> object.
 
 =item * coderef
 
@@ -837,8 +840,8 @@ is missing?
 
     use Net::BitTorrent::DHT;
     my $node = Net::BitTorrent::DHT->new( );
-    my $quest_a = $dht->announce_peer(pack('H*', 'A' x 40), 6881, \&dht_cb);
-    my $quest_b = $dht->announce_peer('1' x 40, 9585, \&dht_cb);
+    my $quest_a = $dht->announce_peer(Bit::Vector->new_Hex('A' x 40), 6881, \&dht_cb);
+    my $quest_b = $dht->announce_peer(Bit::Vector->new_Hex('1' x 40), 9585, \&dht_cb);
 
     sub dht_cb {
         my ($infohash, $port, $node) = @_;
