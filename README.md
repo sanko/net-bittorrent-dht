@@ -6,6 +6,7 @@ Net::BitTorrent::DHT - Kademlia-like DHT Node
 
     use Net::BitTorrent::DHT;
     use AnyEvent;
+    use Bit::Vector;
     # Standalone node with user-defined port and boot_nodes
     my $dht = Net::BitTorrent::DHT->new(
           port => [1337 .. 1340, 0],
@@ -14,7 +15,7 @@ Net::BitTorrent::DHT - Kademlia-like DHT Node
     );
 
     my $peer_quest
-    = $dht->get_peers('ab97a7bca78f2628380e6609a8241a7fb02aa981', \&dht_cb);
+    = $dht->get_peers(Bit::Vector->new_Hex('ab97a7bca78f2628380e6609a8241a7fb02aa981'), \&dht_cb);
 
     # tick, tick, tick, ...
     AnyEvent->condvar->recv;
@@ -51,7 +52,7 @@ support or require the `client` argument but internally a
 of this node. For brevity, the following examples assume you are building a
 [standalone node](https://metacpan.org/pod/Net::BitTorrent::DHT::Standalone) (for reasearch, etc.).
 
-## Net::BitTorrent::DHT->new( nodeid => 'F' x 40 )
+## Net::BitTorrent::DHT->new( nodeid => ... )
 
 During construction, our local DHT nodeID can be set during construction. This
 is mostly useful when creating a
@@ -97,7 +98,9 @@ remote nodes respond, the callback is called with the following arguments:
 - target
 
     This is the target nodeid. This is useful when you've set the same callback
-    for multiple, concurrent `find_node( )` [quest](#quests-and-callbacks) .
+    for multiple, concurrent `find_node( )` [quest](#quests-and-callbacks).
+
+    Targets are 160-bit [Bit::Vector](https://metacpan.org/pod/Bit::Vector) objects.
 
 - node
 
@@ -137,7 +140,8 @@ As they are found, the callback is called with the following arguments:
 - infohash
 
     This is the infohash related to these peers. This is useful when you've set
-    the same callback for multiple, concurrent `get_peers( )` quests.
+    the same callback for multiple, concurrent `get_peers( )` quests. This is a
+    160-bit [Bit::Vector](https://metacpan.org/pod/Bit::Vector) object.
 
 - node
 
@@ -152,7 +156,8 @@ is an array ref which contains the following data:
 
 - infohash
 
-    This is the infohash related to these peers.
+    This is the infohash related to these peers. This is a 160-bit
+    [Bit::Vector](https://metacpan.org/pod/Bit::Vector) object.
 
 - coderef
 
@@ -182,7 +187,8 @@ called with the following arguments:
 
     This is the infohash related to this announcment. This is useful when you've
     set the same callback for multiple, concurrent `announce_peer( )`
-    [quest](#quests-and-callbacks) .
+    [quest](#quests-and-callbacks). Infohashes are 160-bit
+    [Bit::Vector](https://metacpan.org/pod/Bit::Vector) objects.
 
 - port
 
@@ -197,7 +203,8 @@ which contains the following data:
 
 - infohash
 
-    This is the infohash related to these peers.
+    This is the infohash related to these peers. This is a 160-bit
+    [Bit::Vector](https://metacpan.org/pod/Bit::Vector) object.
 
 - coderef
 
@@ -222,8 +229,8 @@ so they should be used together.
 
     use Net::BitTorrent::DHT;
     my $node = Net::BitTorrent::DHT->new( );
-    my $quest_a = $dht->announce_peer(pack('H*', 'A' x 40), 6881, \&dht_cb);
-    my $quest_b = $dht->announce_peer('1' x 40, 9585, \&dht_cb);
+    my $quest_a = $dht->announce_peer(Bit::Vector->new_Hex('A' x 40), 6881, \&dht_cb);
+    my $quest_b = $dht->announce_peer(Bit::Vector->new_Hex('1' x 40), 9585, \&dht_cb);
 
     sub dht_cb {
         my ($infohash, $port, $node) = @_;
