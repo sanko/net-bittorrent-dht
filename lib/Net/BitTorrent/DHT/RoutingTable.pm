@@ -1,10 +1,21 @@
 package Net::BitTorrent::DHT::RoutingTable;
 use Moose;
 use AnyEvent;
+use Net::BitTorrent::DHT::Tracker;
 use Net::BitTorrent::DHT::Bucket;
 our $VERSION = 'v1.0.2';
 eval $VERSION;
 #
+has tracker => (isa        => 'Net::BitTorrent::DHT::Tracker',
+                is         => 'ro',
+                init_arg   => undef,
+                lazy_build => 1
+);
+
+sub _build_tracker {
+    Net::BitTorrent::DHT::Tracker->new(routing_table => shift);
+}
+
 has nodes => (isa      => 'HashRef[Net::BitTorrent::DHT::Node]',
               is       => 'ro',
               init_arg => undef,
