@@ -12,7 +12,12 @@ eval $VERSION;
 my $dht = Net::BitTorrent::DHT->new(
           port => [1337 .. 1340, 0],
           boot_nodes =>
-              [['router.bittorrent.com', 6881], ['router.utorrent.com', 6881]]
+              [
+                ['router.bittorrent.com', 6881],
+                ['router.utorrent.com', 6881],
+                ['router.bittorrent.com', 8991],
+                ['dht.transmissionbt.com', 6881]
+                ]
 );
 
 # Two 'quests' for peers (these are two popular Ubuntu swarms)
