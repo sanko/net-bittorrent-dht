@@ -81,15 +81,14 @@ sub quest_find_node : Test( no_plan ) {
     my $l = join '', map { [0 .. 9, 'a' .. 'f']->[int rand(16)] } 1 .. 40;
     note 'Seeking nodes near ' . $l;
     $s->{'quest'}{'find_node'} = $s->{'dht'}->find_node(
-        $l,
+        Bit::Vector->new_Hex(160, $l),
         sub {
             my ($tar, $nd, $pr) = @_;
             subtest 'find_node callback' => sub {
                 plan tests => 3;
                 isa_ok($tar, 'Bit::Vector',
                        'Target isa a Bit::Vector object');
-                isa_ok($nd,
-                       'Net::BitTorrent::DHT::Node',
+                isa_ok($nd, 'Net::BitTorrent::DHT::Node',
                        'Node is a ...::Node');
                 is ref $pr, 'ARRAY',
                     'List of close nodes is... a list... of addrs?';
@@ -126,8 +125,7 @@ sub quest_announce_peer : Test( no_plan ) {
                 plan tests => 3;
                 isa_ok($infohash, 'Bit::Vector',
                        'Infohash isa a Bit::Vector object');
-                isa_ok($node,
-                       'Net::BitTorrent::DHT::Node',
+                isa_ok($node, 'Net::BitTorrent::DHT::Node',
                        'Node is a ...::Node');
                 ok $port =~ m[^\d+$], 'Port is... a number';
                 note sprintf
@@ -151,15 +149,14 @@ sub quest_get_peers : Test( no_plan ) {
     $s->{'cv'}->begin;
     note 'Seeking peers with ', $s->{'ih'};
     $s->{'quest'}{'get_peers'} = $s->{'dht'}->get_peers(
-        $s->{'ih'},
+        Bit::Vector->new_Hex(160, $s->{'ih'}),
         sub {
             my ($ih, $nd, $pr) = @_;
             subtest 'get_peers callback' => sub {
                 plan tests => 3;
                 isa_ok($ih, 'Bit::Vector',
                        'Infohash isa a Bit::Vector object');
-                isa_ok($nd,
-                       'Net::BitTorrent::DHT::Node',
+                isa_ok($nd, 'Net::BitTorrent::DHT::Node',
                        'Node is a ...::Node');
                 is ref $pr, 'ARRAY',
                     'List of peers is... a list... of peers?';
