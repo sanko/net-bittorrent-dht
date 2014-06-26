@@ -1,6 +1,9 @@
 Revision history for Perl extension Net-BitTorrent-DHT
 
 {{$NEXT}}
+    - Remove fake tracker (only existed for ancient Net::BitTorrent compat)
+
+v1.0.1 2014-06-21T19:57:48Z
 
     - Generate local node id based on external IP (work in progress)
     - Use a condvar in address resolver instead of forcing the event loop
