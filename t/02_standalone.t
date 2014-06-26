@@ -1,43 +1,40 @@
 package t::Standalone;
-
-    use strict;
-    use warnings;
-    use lib 't', 'lib';
-    use lib '../t', '../lib';
-    our $MAJOR = 0; our $MINOR = 74; our $DEV = 13; our $VERSION = sprintf('%0d.%03d' . ($DEV ? (($DEV < 0 ? '' : '_') . '%03d') : ('')), $MAJOR, $MINOR, abs $DEV);
-    use Test::More;
-    use Test::Moose;
-    use AnyEvent;
-    use Bit::Vector;
+use strict;
+use warnings;
+use lib 't',    'lib';
+use lib '../t', '../lib';
+use Test::More;
+use Test::Moose;
+use AnyEvent;
+use Bit::Vector;
 use parent 'Test::Class';
 use feature 'state';
 #
 sub class {'Net::BitTorrent::DHT'}
+#
+sub new_args {
+    my $t = shift;
+    [    #port => [1337 .. 3339, 0],
+       boot_nodes => [['router.utorrent.com',   6881],
+                      ['router.bittorrent.com', 6881],
+                      ['router.bittorrent.com', 8991]
+       ],
+       on_listen_failure => sub {
+           my ($s, $a) = @_;
+           note $a->{'message'};
+           $t->{'cv'}->end if $a->{'protocol'} =~ m[udp];
+       },
+       on_listen_success => sub { my ($s, $a) = @_; note $a->{'message'}; }
+    ];
+}
 
-    #
-    sub new_args {
-        my $t = shift;
-        [    #port => [1337 .. 3339, 0],
-           boot_nodes => [['router.utorrent.com',   6881],
-                          ['router.bittorrent.com', 6881]
-           ],
-           on_listen_failure => sub {
-               my ($s, $a) = @_;
-               note $a->{'message'};
-               $t->{'cv'}->end if $a->{'protocol'} =~ m[udp];
-           },
-           on_listen_success =>
-               sub { my ($s, $a) = @_; note $a->{'message'}; }
-        ];
-    }
-
-    sub startup : Tests(startup => 3) {
-        my $self = shift;
-        use_ok $self->class;
-        can_ok $self->class, 'new';
-        explain $self->new_args;
-        $self->{'dht'} = new_ok $self->class, $self->new_args;
-    }
+sub startup : Tests(startup => 3) {
+    my $self = shift;
+    use_ok $self->class;
+    can_ok $self->class, 'new';
+    explain $self->new_args;
+    $self->{'dht'} = new_ok $self->class, $self->new_args;
+}
 
     sub check_role : Test( 9 ) {
         my $self = shift;
@@ -190,6 +187,6 @@ sub quest_get_peers : Test( no_plan ) {
     is ref $s->{'quest'}{'get_peers'}, 'ARRAY',
         'get_peers quest is an array reference';
 }
-    #
-    __PACKAGE__->runtests() if !caller;
+#
+__PACKAGE__->runtests() if !caller;
 1;

@@ -17,11 +17,9 @@ eval $VERSION;
 
 # Stub
 sub BUILD {1}
-#
-
-# Standalone?
 after 'BUILD' => sub {
     my ($s, $a) = @_;
+
     # Hey! Open up!
     $s->udp6;
     $s->udp4;
@@ -49,22 +47,25 @@ for my $type (qw[requests replies]) {
         }
     }
 }
-has nodeid => (isa         => 'Bit::Vector',
-                 is         => 'ro',
-                 builder    => '_build_nodeid'
+has nodeid => (isa     => 'Bit::Vector',
+               is      => 'ro',
+               builder => '_build_nodeid'
 );
 
 sub _build_nodeid {
     my $s = shift;
+
     # TODO: Base on DHT security extention: http://libtorrent.org/dht_sec.html
     AnyEvent::HTTP::http_get(
         'http://icanhazip.com',
         sub {
             chomp $_[0];
-            $s->nodeid->from_Hex(unpack 'H*', join '',
-            AnyEvent::Socket::parse_address($_[0]),# Ext ipv4 address
-                             (map { chr rand 16 } 1 .. 16));
-}
+            $s->nodeid->from_Hex(
+                unpack 'H*', join '',
+                AnyEvent::Socket::parse_address($_[0]),    # Ext ipv4 address
+                (map { chr rand 16 } 1 .. 16)
+            );
+        }
     );
 
     # alt services:
@@ -109,21 +110,21 @@ sub send {
     return $sent;
 }
 #
-has ipv4_routing_table => (isa => 'Net::BitTorrent::DHT::RoutingTable',
-                             is  => 'ro',
-                             lazy_build => 1,
-                             handles    => {
-                                         ipv4_add_node => 'add_node',
-                                         ipv4_buckets  => 'buckets'
-                             }
+has ipv4_routing_table => (isa        => 'Net::BitTorrent::DHT::RoutingTable',
+                           is         => 'ro',
+                           lazy_build => 1,
+                           handles    => {
+                                       ipv4_add_node => 'add_node',
+                                       ipv4_buckets  => 'buckets'
+                           }
 );
-has ipv6_routing_table => (isa => 'Net::BitTorrent::DHT::RoutingTable',
-                             is  => 'ro',
-                             lazy_build => 1,
-                             handles    => {
-                                         ipv6_add_node => 'add_node',
-                                         ipv6_buckets  => 'buckets'
-                             }
+has ipv6_routing_table => (isa        => 'Net::BitTorrent::DHT::RoutingTable',
+                           is         => 'ro',
+                           lazy_build => 1,
+                           handles    => {
+                                       ipv6_add_node => 'add_node',
+                                       ipv6_buckets  => 'buckets'
+                           }
 );
 
 sub _build_ipv4_routing_table {
@@ -157,7 +158,8 @@ sub add_node {
             ($n->ipv6 ?
                  $s->ipv6_routing_table->add_node($n)
              : $s->ipv4_routing_table->add_node($n)
-            )->find_node($s->nodeid) if! $s->nodeid->is_empty;
+                )->find_node($s->nodeid)
+                if !$s->nodeid->is_empty;
         }
     );
 }
@@ -439,7 +441,8 @@ sub _on_udp4_in {
         $self->_inc_recv_requests_count;
         $self->_inc_recv_requests_length(length $data);
         my $type = $packet->{'q'};
-        $node->_set_nodeid(Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'id'}))
+        $node->_set_nodeid(
+                 Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'id'}))
             if !$node->has_nodeid;    # Adds node to router table
         if ($type eq 'ping' && defined $packet->{'t'}) {
             return $node->_reply_ping($packet->{'t'});
@@ -447,21 +450,33 @@ sub _on_udp4_in {
         elsif ($type eq 'get_peers'
                && defined $packet->{'a'}{'info_hash'})
         {   return
-                $node->_reply_get_peers($packet->{'t'},
-                      Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'info_hash'}));
+                $node->_reply_get_peers(
+                              $packet->{'t'},
+                              Bit::Vector->new_Hex(160, unpack 'H*',
+                                                   $packet->{'a'}{'info_hash'}
+                              )
+                );
         }
         elsif ($type eq 'find_node'
                && defined $packet->{'a'}{'target'})
         {   return
-                $node->_reply_find_node($packet->{'t'},
-                         Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'target'}));
+                $node->_reply_find_node(
+                                 $packet->{'t'},
+                                 Bit::Vector->new_Hex(160, unpack 'H*',
+                                                      $packet->{'a'}{'target'}
+                                 )
+                );
         }
         elsif ($type eq 'announce_peer'
                && defined $packet->{'a'}{'info_hash'})
         {   return
-                $node->_reply_announce_peer($packet->{'t'},
-                       Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'info_hash'}),
-                       $packet->{'a'},);
+                $node->_reply_announce_peer(
+                              $packet->{'t'},
+                              Bit::Vector->new_Hex(160, unpack 'H*',
+                                                   $packet->{'a'}{'info_hash'}
+                              ),
+                              $packet->{'a'},
+                );
         }
         else {
             die '...';
@@ -533,7 +548,6 @@ sub _dump_buckets {
         __data($self->_send_replies_length);
     return @return;
 }
-
 has 'port' => (is      => 'ro',
                isa     => 'Int|ArrayRef[Int]',
                builder => '_build_port',
@@ -541,7 +555,7 @@ has 'port' => (is      => 'ro',
 );
 
 sub _build_port {
-    0; # Let the system pick
+    0;    # Let the system pick
 }
 my %_sock_types = (4 => '0.0.0.0', 6 => '::');
 for my $ipv (keys %_sock_types) {
@@ -725,8 +739,6 @@ has "on_$_" => (isa        => 'CodeRef',
     listen_failure listen_success
 ];
 
-
-
 sub server ($$&;&$) {
     my ($host, $port, $callback, $prepare, $proto) = @_;
     $proto //= 'tcp';
@@ -760,7 +772,8 @@ sub server ($$&;&$) {
             my $flags = 0;
             if ($socket
                 && (my $peer = recv $socket, my ($data), 16 * 1024, $flags))
-            {   my ($service, $host) = Net::BitTorrent::DHT::unpack_sockaddr( $peer);
+            {   my ($service, $host)
+                    = Net::BitTorrent::DHT::unpack_sockaddr($peer);
                 $callback->($socket, $peer, paddr2ip($host), $service,
                             $data, $flags
                 );
@@ -769,7 +782,8 @@ sub server ($$&;&$) {
         : sub {
             while ($socket
                    && (my $peer = accept my ($fh), $socket))
-            {   my ($service, $host) = Net::BitTorrent::DHT::unpack_sockaddr( $peer);
+            {   my ($service, $host)
+                    = Net::BitTorrent::DHT::unpack_sockaddr($peer);
                 $callback->($fh, $peer, paddr2ip($host), $service);
             }
         }
@@ -795,6 +809,7 @@ sub paddr2ip ($) {
     $return =~ s|^::(\d+):(\d+):(\d+):(\d+)|$1.$2.$3.$4|x;
     return $return;
 }
+
 sub __duration ($) {
     my %dhms = (d => int($_[0] / (24 * 60 * 60)),
                 h => ($_[0] / (60 * 60)) % 24,
@@ -823,6 +838,7 @@ sub sockaddr ($$) {
     );
     return $resolver->recv();
 }
+
 sub __data($) {
           $_[0] >= 1073741824 ? sprintf('%0.2f GB', $_[0] / 1073741824)
         : $_[0] >= 1048576    ? sprintf('%0.2f MB', $_[0] / 1048576)
@@ -835,7 +851,7 @@ sub __data($) {
 
 =head1 NAME
 
-Net::BitTorrent::DHT - Kademlia-like DHT Node
+Net::BitTorrent::DHT - Kademlia-like DHT Node for BitTorrent
 
 =head1 Synopsis
 
