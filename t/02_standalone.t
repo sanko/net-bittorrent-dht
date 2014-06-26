@@ -36,15 +36,6 @@ sub startup : Tests(startup => 3) {
     $self->{'dht'} = new_ok $self->class, $self->new_args;
 }
 
-    sub check_role : Test( 9 ) {
-        my $self = shift;
-        does_ok $self->{'dht'}, 'Net::BitTorrent::DHT::Standalone';
-        has_attribute_ok $self->{'dht'}, $_ for qw[port
-            udp6 udp6_sock udp6_host
-            udp4 udp4_sock udp4_host ];
-        ok !$self->{'dht'}->has_client,
-            '... standalone dht nodes have no client';
-    }
 sub setup : Test(setup => 0) {
     my $self = shift;
 }
