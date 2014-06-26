@@ -153,7 +153,7 @@ sub ping {
 sub _reply_ping {
     my ($self, $tid) = @_;
     my $packet
-        = build_dht_reply_ping($tid, pack('H*', $self->dht->nodeid->to_Hex));
+        = build_ping_reply($tid, pack('H*', $self->dht->nodeid->to_Hex));
     my $sent = $self->send($packet, 1);
     $self->inc_fail() if !$sent;
     return $sent;
@@ -184,7 +184,7 @@ sub _reply_find_node {
                  map { [$_->host, $_->port] }
                      @{$self->routing_table->nearest_bucket($target)->nodes});
     return if !$nodes;
-    my $packet = build_dht_reply_find_node($tid, pack('H*', $target->to_Hex),
+    my $packet = build_find_node_reply($tid, pack('H*', $target->to_Hex),
                                            $nodes);
     my $sent = $self->send($packet, 1);
     $self->inc_fail() if !$sent;
@@ -228,7 +228,7 @@ sub _reply_get_peers {
     } @{$self->tracker->get_peers($id) || []};
     return if (!@values && !$nodes);
     my $packet =
-        build_dht_reply_get_peers($tid,
+        build_get_peers_reply($tid,
                                   $id->to_Hex,
                                   \@values,
                                   $nodes,
@@ -274,7 +274,7 @@ sub _reply_announce_peer {
             $a_ref->{'token'})
         )
     {   $packet =
-            build_dht_reply_error($tid,
+            build_error_reply($tid,
                                   [203,
                                    'Incorrect write token in announce_peer'
                                   ]
@@ -284,11 +284,11 @@ sub _reply_announce_peer {
          !$self->tracker->add_peer($info_hash, [$self->host, $a_ref->{'port'}]
          )
         )
-    {   $packet = build_dht_reply_error($tid,
+    {   $packet = build_error_reply($tid,
                                       [202, 'Failed to add peer to tracker']);
     }
     else {
-        $packet = build_dht_reply_announce_peer($tid,
+        $packet = build_announce_peer_reply($tid,
                                       pack('H*', $self->dht->nodeid->to_Hex));
     }
     my $sent = $self->send($packet, 1);

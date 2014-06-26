@@ -18,21 +18,10 @@ eval $VERSION;
 # Stub
 sub BUILD {1}
 #
-has 'client' => (isa       => 'Net::BitTorrent',
-                 is        => 'ro',
-                 predicate => 'has_client'
-);
 
 # Standalone?
 after 'BUILD' => sub {
     my ($s, $a) = @_;
-    return has '+client' =>
-        (handles => qr[^(?:(?:has_)?udp\d.*?|ip_filter|port)])
-        if $s->has_client;
-    Moose::Util::apply_all_roles($s,
-                                 'Net::BitTorrent::DHT::Standalone',
-                                 {rebless_params => $a});
-
     # Hey! Open up!
     $s->udp6;
     $s->udp4;
@@ -450,7 +439,7 @@ sub _on_udp4_in {
         $self->_inc_recv_requests_count;
         $self->_inc_recv_requests_length(length $data);
         my $type = $packet->{'q'};
-        $node->_set_nodeid(Bit::Vector->new_Hex(160, $packet->{'a'}{'id'}))
+        $node->_set_nodeid(Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'id'}))
             if !$node->has_nodeid;    # Adds node to router table
         if ($type eq 'ping' && defined $packet->{'t'}) {
             return $node->_reply_ping($packet->{'t'});
@@ -459,19 +448,19 @@ sub _on_udp4_in {
                && defined $packet->{'a'}{'info_hash'})
         {   return
                 $node->_reply_get_peers($packet->{'t'},
-                      Bit::Vector->new_Dec(160, $packet->{'a'}{'info_hash'}));
+                      Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'info_hash'}));
         }
         elsif ($type eq 'find_node'
                && defined $packet->{'a'}{'target'})
         {   return
                 $node->_reply_find_node($packet->{'t'},
-                         Bit::Vector->new_Dec(160, $packet->{'a'}{'target'}));
+                         Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'target'}));
         }
         elsif ($type eq 'announce_peer'
                && defined $packet->{'a'}{'info_hash'})
         {   return
                 $node->_reply_announce_peer($packet->{'t'},
-                       Bit::Vector->new_Dec(160, $packet->{'a'}{'info_hash'}),
+                       Bit::Vector->new_Hex(160, unpack 'H*', $packet->{'a'}{'info_hash'}),
                        $packet->{'a'},);
         }
         else {
@@ -545,6 +534,267 @@ sub _dump_buckets {
     return @return;
 }
 
+has 'port' => (is      => 'ro',
+               isa     => 'Int|ArrayRef[Int]',
+               builder => '_build_port',
+               writer  => '_set_port'
+);
+
+sub _build_port {
+    0; # Let the system pick
+}
+my %_sock_types = (4 => '0.0.0.0', 6 => '::');
+for my $ipv (keys %_sock_types) {
+    has 'udp'
+        . $ipv => (is         => 'ro',
+                   init_arg   => undef,
+                   isa        => 'Maybe[Object]',
+                   lazy_build => 1,
+                   writer     => '_set_udp' . $ipv
+        );
+    has 'udp'
+        . $ipv
+        . '_sock' => (is         => 'ro',
+                      init_arg   => undef,
+                      isa        => 'GlobRef',
+                      lazy_build => 1,
+                      weak_ref   => 1,
+                      writer     => '_set_udp' . $ipv . '_sock'
+        );
+    has 'udp'
+        . $ipv
+        . '_host' => (is      => 'ro',
+                      isa     => 'Str',
+                      default => $_sock_types{$ipv},
+                      writer  => '_set_udp' . $ipv . '_host'
+        );
+}
+#
+has 'ip_filter' => (is       => 'ro',
+                    isa      => 'Maybe[Config::IPFilter]',
+                    init_arg => undef,
+                    builder  => '_build_ip_filter'
+);
+
+sub _build_ip_filter {
+    return eval('require Config::IPFilter;') ? Config::IPFilter->new() : ();
+}
+
+sub _build_udp6 {
+    my $s = shift;
+    my ($server, $actual_socket, $actual_host, $actual_port);
+    for my $port (ref $s->port ? @{$s->port} : $s->port) {
+        $server = server(
+            $s->udp6_host,
+            $port,
+            sub { $s->_on_udp6_in(@_); },
+            sub {
+                ($actual_socket, $actual_host, $actual_port) = @_;
+
+                #if ($self->port != $port) { ...; }
+                $s->_set_udp6_sock($actual_socket);
+                $s->_set_udp6_host($actual_host);
+                $s->_set_port($actual_port);
+            },
+            'udp'
+        );
+        last if defined $server;
+    }
+    if ($server) {
+        $s->trigger_listen_success(
+                      {port     => $actual_port,
+                       protocol => 'udp6',
+                       severity => 'debug',
+                       event    => 'listen_success',
+                       message  => sprintf
+                           'Bound UDP port %d to the outside world over IPv6',
+                       $actual_port
+                      }
+        );
+    }
+    else {
+        $s->trigger_listen_failure(
+                {port     => $s->port,
+                 protocol => 'udp6',
+                 severity => 'fatal',
+                 event    => 'listen_failure',
+                 message =>
+                     'Failed to bind UDP port for the outside world over IPv6'
+                }
+        );
+    }
+    return $server;
+}
+
+sub _build_udp4 {
+    my $s = shift;
+    my ($server, $actual_socket, $actual_host, $actual_port);
+    for my $port (ref $s->port ? @{$s->port} : $s->port) {
+        $server = server(
+            $s->udp4_host,
+            $port,
+            sub { $s->_on_udp4_in(@_); },
+            sub {
+                ($actual_socket, $actual_host, $actual_port) = @_;
+
+                #if ($self->port != $port) { ...; }
+                $s->_set_udp4_sock($actual_socket);
+                $s->_set_udp4_host($actual_host);
+                $s->_set_port($actual_port);
+            },
+            'udp'
+        );
+        last if defined $server;
+    }
+    if ($server) {
+        $s->trigger_listen_success(
+                      {port     => $actual_port,
+                       protocol => 'udp4',
+                       severity => 'debug',
+                       event    => 'listen_success',
+                       message  => sprintf
+                           'Bound UDP port %d to the outside world over IPv4',
+                       $actual_port
+                      }
+        );
+    }
+    else {
+        $s->trigger_listen_failure(
+                {port     => $s->port,
+                 protocol => 'udp4',
+                 severity => 'fatal',
+                 event    => 'listen_failure',
+                 message =>
+                     'Failed to bind UDP port for the outside world over IPv4'
+                }
+        );
+    }
+    return $server;
+}
+around '_on_udp4_in' => sub {
+    my ($c, $s, $sock, $sockaddr, $host, $port, $data, $flags) = @_;
+    if (defined $s->ip_filter) {
+        my $rule = $s->ip_filter->is_banned($host);
+        if (defined $rule) {
+            $s->trigger_ip_filter(
+                           {protocol => 'udp4',
+                            severity => 'debug',
+                            event    => 'ip_filter',
+                            address  => [$host, $port],
+                            rule     => $rule,
+                            message => 'Incoming data was blocked by ipfilter'
+                           }
+            );
+            return;
+        }
+    }
+    $c->($s, $sock, $sockaddr, $host, $port, $data, $flags);
+};
+around '_on_udp6_in' => sub {
+    my ($c, $s, $sock, $sockaddr, $host, $port, $data, $flags) = @_;
+    my $rule = $s->ip_filter->is_banned($host);
+    if (defined $rule) {
+        $s->trigger_ip_filter(
+                           {protocol => 'udp6',
+                            severity => 'debug',
+                            event    => 'ip_filter',
+                            address  => [$host, $port],
+                            rule     => $rule,
+                            message => 'Incoming data was blocked by ipfilter'
+                           }
+        );
+        return;
+    }
+    $c->($s, $sock, $sockaddr, $host, $port, $data, $flags);
+};
+
+# Callback system
+sub _build_callback_no_op {
+    sub {1}
+}
+has "on_$_" => (isa        => 'CodeRef',
+                is         => 'ro',
+                traits     => ['Code'],
+                handles    => {"trigger_$_" => 'execute_method'},
+                lazy_build => 1,
+                builder    => '_build_callback_no_op',
+                clearer    => "_no_$_",
+                weak_ref   => 1
+    )
+    for qw[
+    listen_failure listen_success
+];
+
+
+
+sub server ($$&;&$) {
+    my ($host, $port, $callback, $prepare, $proto) = @_;
+    $proto //= 'tcp';
+    my $sockaddr = Net::BitTorrent::DHT::sockaddr($host, $port) or return;
+    my $type = length $sockaddr == 16 ? PF_INET : PF_INET6;
+    socket my ($socket), $type,
+        $proto eq 'udp' ? SOCK_DGRAM : SOCK_STREAM, getprotobyname($proto)
+        or return;
+
+    # - What is the difference between SO_REUSEADDR and SO_REUSEPORT?
+    #    [http://www.unixguide.net/network/socketfaq/4.11.shtml]
+    # SO_REUSEPORT is undefined on Win32 and pre-2.4.15 Linux distros.
+    setsockopt $socket, SOL_SOCKET, SO_REUSEADDR, pack('l', 1)
+        or return
+        if $^O !~ m[Win32];
+    return if !bind $socket, $sockaddr;
+    my $listen = 8;
+    if (defined $prepare) {
+        my ($_port, $packed_ip)
+            = Net::BitTorrent::DHT::unpack_sockaddr(getsockname $socket);
+        my $return = $prepare->($socket, paddr2ip($packed_ip), $_port);
+        $listen = $return if defined $return;
+    }
+    require AnyEvent::Util;
+    AnyEvent::Util::fh_nonblocking $socket, 1;
+    listen $socket, $listen or return if $proto ne 'udp';
+    return AE::io(
+        $socket, 0,
+        $proto eq 'udp' ?
+            sub {
+            my $flags = 0;
+            if ($socket
+                && (my $peer = recv $socket, my ($data), 16 * 1024, $flags))
+            {   my ($service, $host) = Net::BitTorrent::DHT::unpack_sockaddr( $peer);
+                $callback->($socket, $peer, paddr2ip($host), $service,
+                            $data, $flags
+                );
+            }
+            }
+        : sub {
+            while ($socket
+                   && (my $peer = accept my ($fh), $socket))
+            {   my ($service, $host) = Net::BitTorrent::DHT::unpack_sockaddr( $peer);
+                $callback->($fh, $peer, paddr2ip($host), $service);
+            }
+        }
+    );
+}
+
+sub paddr2ip ($) {
+    return inet_ntoa($_[0]) if length $_[0] == 4;    # ipv4
+    return inet_ntoa($1)
+        if length $_[0] == 16
+        && $_[0] =~ m[^\0{10}\xff{2}(.{4})$];        # ipv4
+    return unless length($_[0]) == 16;
+    my @hex = (unpack('n8', $_[0]));
+    $hex[9] = $hex[7] & 0xff;
+    $hex[8] = $hex[7] >> 8;
+    $hex[7] = $hex[6] & 0xff;
+    $hex[6] >>= 8;
+    my $return = sprintf '%X:%X:%X:%X:%X:%X:%D:%D:%D:%D', @hex;
+    $return =~ s|(0+:)+|:|x;
+    $return =~ s|^0+    ||x;
+    $return =~ s|^:+    |::|x;
+    $return =~ s|::0+   |::|x;
+    $return =~ s|^::(\d+):(\d+):(\d+):(\d+)|$1.$2.$3.$4|x;
+    return $return;
+}
 sub __duration ($) {
     my %dhms = (d => int($_[0] / (24 * 60 * 60)),
                 h => ($_[0] / (60 * 60)) % 24,
@@ -561,6 +811,18 @@ sub unpack_sockaddr ($) {
         : unpack_sockaddr_in($packed_host);
 }
 
+sub sockaddr ($$) {
+    my $resolver = AE::cv();
+    AnyEvent::Socket::resolve_sockaddr(
+        $_[0],
+        $_[1],
+        0, undef, undef,
+        sub {
+            $resolver->send($_[0]->[3]);
+        }
+    );
+    return $resolver->recv();
+}
 sub __data($) {
           $_[0] >= 1073741824 ? sprintf('%0.2f GB', $_[0] / 1073741824)
         : $_[0] >= 1048576    ? sprintf('%0.2f MB', $_[0] / 1048576)
@@ -619,10 +881,7 @@ The constructor accepts a number different arguments which all greatly affect
 the function of your DHT node. Any combination of the following arguments may
 be used during construction.
 
-Note that L<standalone|Net::BitTorrent::DHT::Standalone> DHT nodes do not
-support or require the C<client> argument but internally a
-L<Net::BitTorrent|Net::BitTorrent> client is passed and serves as the parent
-of this node. For brevity, the following examples assume you are building a
+For brevity, the following examples assume you are building a
 L<standalone node|Net::BitTorrent::DHT::Standalone> (for reasearch, etc.).
 
 =head2 Net::BitTorrent::DHT->new( nodeid => ... )
