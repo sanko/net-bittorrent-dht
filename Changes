@@ -1,7 +1,9 @@
 Revision history for Perl extension Net-BitTorrent-DHT
 
 {{$NEXT}}
+
     - Serve as a standalone node by default
+    - Update to NB::Protocol v1.0.2 and above
 
 v1.0.1 2014-06-21T19:57:48Z
 
@@ -10,4 +12,4 @@ v1.0.1 2014-06-21T19:57:48Z
 
 v1.0.0 2014-06-21T16:04:36Z
 
-    - original version (broken from unstable Net::BitTorrernt dist)
+    - original version (broken from unstable Net::BitTorrent dist)

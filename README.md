@@ -1,6 +1,6 @@
 # NAME
 
-Net::BitTorrent::DHT - Kademlia-like DHT Node
+Net::BitTorrent::DHT - Kademlia-like DHT Node for BitTorrent
 
 # Synopsis
 
@@ -46,10 +46,7 @@ The constructor accepts a number different arguments which all greatly affect
 the function of your DHT node. Any combination of the following arguments may
 be used during construction.
 
-Note that [standalone](https://metacpan.org/pod/Net::BitTorrent::DHT::Standalone) DHT nodes do not
-support or require the `client` argument but internally a
-[Net::BitTorrent](https://metacpan.org/pod/Net::BitTorrent) client is passed and serves as the parent
-of this node. For brevity, the following examples assume you are building a
+For brevity, the following examples assume you are building a
 [standalone node](https://metacpan.org/pod/Net::BitTorrent::DHT::Standalone) (for reasearch, etc.).
 
 ## Net::BitTorrent::DHT->new( nodeid => ... )

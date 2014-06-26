@@ -5,7 +5,7 @@ requires 'Bit::Vector';
 requires 'Moose';
 requires 'Moose::Role';
 requires 'Moose::Util::TypeConstraints';
-requires 'Net::BitTorrent::Protocol';
+requires 'Net::BitTorrent::Protocol', 'v1.0.2';
 requires 'Scalar::Util';
 requires 'Socket';
 requires 'feature';
