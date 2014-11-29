@@ -3,7 +3,7 @@ use Moose;
 use AnyEvent;
 use Net::BitTorrent::DHT::Tracker;
 use Net::BitTorrent::DHT::Bucket;
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.0.3';
 eval $VERSION;
 #
 has tracker => (isa        => 'Net::BitTorrent::DHT::Tracker',

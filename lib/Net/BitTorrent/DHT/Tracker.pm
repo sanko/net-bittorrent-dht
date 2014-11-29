@@ -1,6 +1,6 @@
 package Net::BitTorrent::DHT::Tracker;
 use Moose;
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.0.3';
 eval $VERSION;
 #
 has peers => (isa      => 'HashRef[ArrayRef]',

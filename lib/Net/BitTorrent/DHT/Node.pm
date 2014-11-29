@@ -6,7 +6,7 @@ use Net::BitTorrent::Protocol qw[:dht :compact];
 use feature qw[state];
 use Scalar::Util;
 use Types::Standard qw[Bool Int Ref Str];
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.0.3';
 eval $VERSION;
 #
 sub BUILD {1}

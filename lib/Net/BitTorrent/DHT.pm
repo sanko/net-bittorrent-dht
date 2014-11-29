@@ -12,7 +12,7 @@ use Bit::Vector;
 use Net::BitTorrent::DHT::Node;
 use Net::BitTorrent::DHT::RoutingTable;
 use 5.10.0;
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.0.3';
 eval $VERSION;
 
 # Stub

@@ -5,7 +5,7 @@ use AnyEvent;
 use Bit::Vector;
 use Scalar::Util;
 use feature qw[state];
-our $VERSION = 'v1.0.2';
+our $VERSION = 'v1.0.3';
 eval $VERSION;
 
 # Stub

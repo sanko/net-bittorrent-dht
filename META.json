@@ -4,7 +4,7 @@
       "Sanko Robinson <sanko@cpan.org> - http://sankorobinson.com/"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v1.1.0, CPAN::Meta::Converter version 2.141170",
+   "generated_by" : "Minilla/v2.2.1, CPAN::Meta::Converter version 2.141170",
    "license" : [
       "artistic_2"
    ],
@@ -55,6 +55,7 @@
             "Net::BitTorrent::Protocol" : "v1.0.2",
             "Scalar::Util" : "0",
             "Socket" : "0",
+            "Types::Standard" : "0",
             "feature" : "0",
             "perl" : "v5.10.0"
          }
@@ -79,5 +80,5 @@
          "web" : "https://github.com/sanko/net-bittorrent-dht"
       }
    },
-   "version" : "v1.0.2"
+   "version" : "v1.0.3"
 }
